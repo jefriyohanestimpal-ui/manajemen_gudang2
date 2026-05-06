@@ -3,440 +3,340 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CocosGlobal Pro - Enterprise System</title>
+    <title>Sistem Gudang PT. ABCD - Premium Blue</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SDK SUPABASE -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        @media print { .no-print { display: none; } .print-only { display: block !important; } }
-        .print-only { display: none; }
-        .active-tab { border-bottom: 4px solid #16a34a; color: #16a34a; font-weight: 800; }
-        .card-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            /* Gradient Biru Background */
+            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 50%, #eff6ff 100%);
+            min-height: 100vh;
+        }
+        [x-cloak] { display: none !important; }
+        @media print {
+            @page { size: auto; margin: 0; }
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+        /* Custom Scrollbar for better UI */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+<body x-data="warehouseApp()" x-init="initApp()">
 
-    <!-- HALAMAN AUTH -->
-    <div id="auth-screen" class="fixed inset-0 bg-slate-950 flex items-center justify-center z-[100]">
-        <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md mx-4">
-            <div class="text-center mb-8">
-                <h1 class="text-4xl font-black text-green-700 tracking-tighter">COCOS<span class="text-slate-800">GLOBAL</span></h1>
-                <p class="text-gray-400 mt-2 text-sm">Logistics & Commodity Management</p>
+    <!-- Sidebar Navigation -->
+    <nav class="fixed bottom-0 w-full lg:top-0 lg:left-0 lg:w-20 lg:h-full bg-white/80 backdrop-blur-md border-t lg:border-r border-blue-100 z-50 flex lg:flex-col justify-around lg:justify-center items-center p-4">
+        <div class="hidden lg:block mb-8 bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+            <i data-lucide="palmtree"></i>
+        </div>
+        <button @click="tab = 'pos'" :class="tab === 'pos' ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-slate-400'" class="p-3 rounded-2xl transition-all duration-300"><i data-lucide="shopping-cart"></i></button>
+        <button @click="tab = 'stock'" :class="tab === 'stock' ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-slate-400'" class="p-3 rounded-2xl transition-all duration-300"><i data-lucide="box"></i></button>
+        <button @click="tab = 'report'" :class="tab === 'report' ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-slate-400'" class="p-3 rounded-2xl transition-all duration-300"><i data-lucide="file-text"></i></button>
+        <button @click="tab = 'owner'" :class="tab === 'owner' ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-slate-400'" class="p-3 rounded-2xl transition-all duration-300"><i data-lucide="shield-check"></i></button>
+    </nav>
+
+    <main class="lg:ml-20 p-4 lg:p-8 pb-24 lg:pb-8 max-w-7xl mx-auto">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-blue-900 tracking-tight">PT. ABCD <span class="text-blue-600 font-light">Gudang</span></h1>
+                <p class="text-blue-500/80 text-sm font-semibold" x-text="currentTime"></p>
             </div>
-            <div class="space-y-4">
-                <input type="email" id="auth-email" placeholder="Email Admin" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-green-500 outline-none transition">
-                <input type="password" id="auth-password" placeholder="Password" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-green-500 outline-none transition">
-                <button onclick="handleAuth('login')" class="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-700 shadow-xl shadow-green-100 transition-all active:scale-95">LOGIN SYSTEM</button>
-                <p class="text-center text-[10px] text-gray-400 uppercase tracking-widest font-bold">Authorized Access Only</p>
+            
+            <div class="flex items-center gap-4 bg-white/60 backdrop-blur-md p-2 px-4 rounded-2xl shadow-sm border border-white">
+                <div class="text-right">
+                    <p class="text-[10px] text-blue-400 uppercase font-black tracking-widest leading-none">Saldo Kas</p>
+                    <p class="text-lg font-bold text-slate-800" x-text="formatRupiah(saldo)"></p>
+                </div>
+                <div class="h-8 w-px bg-blue-100"></div>
+                <button @click="isOwner ? logoutOwner() : (showPinModal = true)" 
+                        :class="isOwner ? 'bg-red-500 text-white shadow-red-100' : 'bg-blue-600 text-white shadow-blue-100'"
+                        class="px-4 py-2 rounded-xl text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center gap-2">
+                    <i :data-lucide="isOwner ? 'unlock' : 'lock'" class="w-4 h-4"></i>
+                    <span x-text="isOwner ? 'Owner Aktif' : 'Login Owner'"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- POS SECTION -->
+        <div x-show="tab === 'pos'" x-cloak class="grid lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-6 text-left">
+                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-xl shadow-blue-900/5">
+                    <div class="flex gap-4 mb-6 bg-blue-50/50 p-1.5 rounded-2xl">
+                        <button @click="newTx.type = 'BELI'" :class="newTx.type === 'BELI' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-400'" class="flex-1 py-3 rounded-xl font-bold transition-all">BELI</button>
+                        <button @click="newTx.type = 'JUAL'" :class="newTx.type === 'JUAL' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-400'" class="flex-1 py-3 rounded-xl font-bold transition-all">JUAL</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="md:col-span-2">
+                            <label class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Pilih Komoditi</label>
+                            <select x-model="newTx.item" class="w-full mt-2 p-4 bg-white border border-blue-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition font-semibold text-slate-700">
+                                <template x-for="item in items"><option :value="item" x-text="item"></option></template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Jumlah Berat/Unit</label>
+                            <div class="flex gap-2 mt-2">
+                                <input type="number" x-model.number="newTx.qty" class="w-full p-4 bg-white border border-blue-50 rounded-2xl outline-none font-bold text-slate-700">
+                                <select x-model="newTx.unit" class="p-4 bg-white border border-blue-50 rounded-2xl font-bold text-blue-600">
+                                    <option value="Kg">Kg</option><option value="Pc">Pc</option><option value="Karung">Kar</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total Nominal (Rp)</label>
+                            <input type="number" x-model.number="newTx.total" class="w-full mt-2 p-4 bg-white border border-blue-50 rounded-2xl outline-none font-black text-blue-700 text-xl">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3 mb-8">
+                        <template x-for="m in ['Tunai', 'Transfer', 'Bon']">
+                            <button @click="newTx.payMethod = m" :class="newTx.payMethod === m ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200' : 'bg-white text-blue-400 border-blue-50'" class="py-4 rounded-2xl font-bold border transition-all text-sm" x-text="m"></button>
+                        </template>
+                    </div>
+
+                    <button @click="processTransaction()" class="w-full py-5 bg-slate-900 hover:bg-blue-900 text-white rounded-2xl font-black shadow-xl flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
+                        <i data-lucide="printer" class="w-5 h-5"></i> SIMPAN & CETAK NOTA
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-6 text-left">
+                <!-- Piutang Card -->
+                <div class="bg-gradient-to-br from-white to-blue-50 p-6 rounded-3xl border border-white shadow-lg shadow-blue-900/5">
+                    <h3 class="font-bold text-blue-900 mb-2 flex items-center gap-2"><i data-lucide="alert-circle" class="text-amber-500 w-5 h-5"></i> Total Piutang</h3>
+                    <p class="text-3xl font-black text-slate-900" x-text="formatRupiah(totalPiutang)"></p>
+                </div>
+
+                <!-- Admin Action Card -->
+                <div x-show="isOwner" x-cloak class="bg-blue-600 p-6 rounded-3xl shadow-xl shadow-blue-200 text-white transform transition-all animate-in fade-in zoom-in duration-300">
+                    <h3 class="font-bold mb-4 flex items-center gap-2"><i data-lucide="wallet" class="w-5 h-5"></i> Tambah Modal Kas</h3>
+                    <input type="number" x-model.number="modalInput" placeholder="Nominal Rp" class="w-full p-4 bg-white/10 border border-white/20 rounded-2xl mb-4 placeholder-white/50 text-white font-black outline-none focus:bg-white/20">
+                    <button @click="addModal()" class="w-full py-4 bg-white text-blue-600 rounded-2xl font-black shadow-lg hover:bg-blue-50 transition-all active:scale-95">INPUT MODAL</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- REPORT SECTION -->
+        <div x-show="tab === 'report'" x-cloak class="bg-white/80 backdrop-blur-md rounded-3xl border border-white shadow-xl shadow-blue-900/5 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+            <div class="p-6 border-b border-blue-50 flex justify-between items-center bg-white/40">
+                <h3 class="font-black text-blue-900 text-lg">Histori Transaksi</h3>
+                <div x-show="isOwner" class="text-[10px] bg-red-50 text-red-600 px-3 py-1 rounded-full font-black uppercase tracking-widest">Otoritas Hapus Aktif</div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-blue-50/50 text-blue-400 text-[10px] uppercase font-black tracking-widest border-b border-blue-100">
+                        <tr>
+                            <th class="p-5">Waktu</th>
+                            <th class="p-5">Tipe</th>
+                            <th class="p-5">Keterangan</th>
+                            <th class="p-5 text-right">Nominal</th>
+                            <th class="p-5">Metode</th>
+                            <th class="p-5 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm divide-y divide-blue-50">
+                        <template x-for="tx in history" :key="tx.id">
+                            <tr class="hover:bg-blue-50/30 transition-colors">
+                                <td class="p-5 text-slate-500 font-medium" x-text="tx.time"></td>
+                                <td class="p-5">
+                                    <span :class="tx.type === 'BELI' ? 'text-rose-600 bg-rose-50' : 'text-blue-600 bg-blue-50'" class="px-3 py-1 rounded-lg font-black text-[10px]" x-text="tx.type"></span>
+                                </td>
+                                <td class="p-5 font-bold text-slate-700" x-text="tx.desc"></td>
+                                <td class="p-5 text-right font-black text-slate-900" x-text="formatRupiah(tx.amount)"></td>
+                                <td class="p-5"><span class="text-[10px] font-bold text-blue-400 bg-white border border-blue-100 px-2 py-1 rounded-md" x-text="tx.method"></span></td>
+                                <td class="p-5 text-center">
+                                    <div x-show="isOwner">
+                                        <button @click="deleteTx(tx.id)" class="text-rose-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-all">
+                                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                        </button>
+                                    </div>
+                                    <span x-show="!isOwner" class="text-slate-200">-</span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- STOCK SECTION -->
+        <div x-show="tab === 'stock'" x-cloak class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+            <template x-for="s in stockData">
+                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-white shadow-lg shadow-blue-900/5 group hover:border-blue-200 transition-all">
+                    <h3 class="text-lg font-black text-blue-900 mb-4" x-text="s.name"></h3>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="bg-blue-50/50 p-3 rounded-2xl text-center"><p class="text-[9px] font-black text-blue-400 uppercase">Kg</p><p class="text-xl font-black text-slate-800" x-text="s.kg"></p></div>
+                        <div class="bg-blue-50/50 p-3 rounded-2xl text-center"><p class="text-[9px] font-black text-blue-400 uppercase">Pc</p><p class="text-xl font-black text-slate-800" x-text="s.pc"></p></div>
+                        <div class="bg-blue-50/50 p-3 rounded-2xl text-center"><p class="text-[9px] font-black text-blue-400 uppercase">Kar</p><p class="text-xl font-black text-slate-800" x-text="s.karung"></p></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <!-- PIN MODAL -->
+    <div x-show="showPinModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-blue-900/40 backdrop-blur-md">
+        <div class="bg-white p-8 rounded-[40px] shadow-2xl w-full max-w-sm text-center border border-white animate-in zoom-in duration-300">
+            <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="shield-check" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-2xl font-black text-slate-800 mb-2">Akses Owner</h3>
+            <p class="text-slate-400 text-sm mb-8 font-medium">Silakan masukkan 4 digit PIN</p>
+            <input type="password" x-model="inputPin" maxlength="4" placeholder="••••" 
+                   @keyup.enter="verifyOwner()"
+                   class="w-full text-center text-5xl tracking-[0.5em] p-6 bg-slate-50 border-2 border-slate-100 rounded-3xl mb-8 outline-none focus:border-blue-500 focus:bg-white transition-all font-black text-blue-600">
+            <div class="flex gap-4">
+                <button @click="showPinModal = false; inputPin = ''" class="flex-1 py-4 text-slate-400 font-bold hover:text-slate-600 transition-colors">Batal</button>
+                <button @click="verifyOwner()" class="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all transform active:scale-95">Buka</button>
             </div>
         </div>
     </div>
 
-    <!-- MAIN APP -->
-    <div id="main-app" class="hidden">
-        <!-- Header -->
-        <header class="bg-white border-b p-4 sticky top-0 z-50 no-print">
-            <div class="max-w-7xl mx-auto flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <div class="relative group">
-                        <img id="app-logo" src="https://via.placeholder.com/100?text=LOGO" class="h-12 w-12 object-cover rounded-xl border-2 border-slate-100 shadow-sm">
-                        <input type="file" id="logo-input" class="hidden" accept="image/*" onchange="updateLogo(event)">
-                        <label for="logo-input" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-[8px] opacity-0 group-hover:opacity-100 cursor-pointer rounded-xl transition">GANTI</label>
-                    </div>
-                    <div>
-                        <h2 class="font-black text-xl leading-none">COCOSGLOBAL</h2>
-                        <span id="user-role" class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-500 uppercase tracking-wider">Loading...</span>
-                    </div>
-                </div>
-                <button onclick="logout()" class="text-red-500 font-bold text-xs hover:bg-red-50 px-4 py-2 rounded-xl transition">LOGOUT</button>
-            </div>
-        </header>
-
-        <main class="p-4 md:p-8 max-w-7xl mx-auto">
-            <!-- Summary Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 no-print">
-                <div class="bg-white p-8 rounded-[2rem] card-shadow border-t-4 border-green-500">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Kas Utama (IDR)</p>
-                    <h3 id="stat-balance" class="text-3xl font-black">Rp 0</h3>
-                    <button onclick="topUpModal()" class="owner-only text-green-600 text-[10px] font-bold mt-2 hover:underline tracking-tight">+ TAMBAH MODAL AWAL</button>
-                </div>
-                <div class="bg-white p-8 rounded-[2rem] card-shadow border-t-4 border-orange-500">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Piutang (Bon)</p>
-                    <h3 id="stat-receivable" class="text-3xl font-black text-orange-600">Rp 0</h3>
-                </div>
-                <div class="bg-white p-8 rounded-[2rem] card-shadow border-t-4 border-blue-500 flex flex-col justify-center">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Sinkronisasi</p>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-                        <span class="text-sm font-bold text-slate-700 italic">Cloud Connected</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Navigation Tabs -->
-            <div class="flex gap-8 mb-8 border-b no-print overflow-x-auto whitespace-nowrap scrollbar-hide">
-                <button onclick="switchTab('pos')" id="btn-pos" class="pb-4 active-tab text-sm transition-all uppercase tracking-widest">Transaksi Jual/Beli</button>
-                <button onclick="switchTab('stock')" id="btn-stock" class="pb-4 text-slate-400 text-sm transition-all uppercase tracking-widest font-bold">Stok Gudang</button>
-                <button onclick="switchTab('expenses')" id="btn-expenses" class="pb-4 text-slate-400 text-sm transition-all uppercase tracking-widest font-bold">Biaya Pengeluaran</button>
-                <button onclick="switchTab('history')" id="btn-history" class="pb-4 text-slate-400 text-sm transition-all uppercase tracking-widest font-bold">Laporan & Histori</button>
-            </div>
-
-            <!-- TAB: POS -->
-            <section id="tab-pos" class="tab-content animate-in slide-in-from-bottom-4 duration-500">
-                <div class="bg-white p-8 rounded-[2.5rem] card-shadow border max-w-4xl">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div class="space-y-5">
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Jenis Transaksi</label>
-                                <select id="tx-type" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold focus:border-green-500 outline-none">
-                                    <option value="jual">PENJUALAN (Barang Keluar)</option>
-                                    <option value="beli">PEMBELIAN (Barang Masuk)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Pilih Komoditi</label>
-                                <select id="tx-item" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold focus:border-green-500 outline-none"></select>
-                            </div>
-                        </div>
-                        <div class="space-y-5">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Jumlah</label>
-                                    <input type="number" id="tx-qty" placeholder="0" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Harga Satuan</label>
-                                    <input type="number" id="tx-price" placeholder="Rp" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Metode Bayar</label>
-                                <select id="tx-method" class="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold">
-                                    <option value="tunai">TUNAI</option>
-                                    <option value="transfer">TRANSFER</option>
-                                    <option value="bon">BON (PIUTANG)</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <button onclick="processTransaction()" class="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-xl mt-10 hover:bg-black shadow-2xl transition-all active:scale-95 uppercase tracking-tighter">
-                        Cetak Nota & Simpan Data
-                    </button>
-                </div>
-            </section>
-
-            <!-- TAB: STOCK -->
-            <section id="tab-stock" class="tab-content hidden animate-in fade-in duration-500">
-                <div class="bg-white rounded-[2rem] card-shadow overflow-hidden border">
-                    <table class="w-full text-left">
-                        <thead class="bg-slate-50 border-b">
-                            <tr>
-                                <th class="p-6 text-xs font-black text-slate-400 uppercase">Nama Komoditi</th>
-                                <th class="p-6 text-right text-xs font-black text-slate-400 uppercase">Stok Saat Ini</th>
-                                <th class="p-6 text-center text-xs font-black text-slate-400 uppercase">Satuan</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stock-list"></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- TAB: EXPENSES (PENGELUARAN) -->
-            <section id="tab-expenses" class="tab-content hidden animate-in fade-in duration-500">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="bg-white p-8 rounded-[2rem] card-shadow border h-fit">
-                        <h3 class="font-black text-lg mb-6 flex items-center gap-2">
-                            <span class="w-2 h-6 bg-red-500 rounded-full"></span> Input Pengeluaran
-                        </h3>
-                        <div class="space-y-4">
-                            <input type="text" id="exp-desc" placeholder="Keterangan (Bensin, Gaji...)" class="w-full p-4 bg-slate-50 border rounded-2xl font-semibold">
-                            <input type="number" id="exp-amount" placeholder="Nominal (Rp)" class="w-full p-4 bg-slate-50 border rounded-2xl font-semibold">
-                            <button onclick="submitExpense()" class="w-full bg-red-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-red-100 hover:bg-red-600 transition">SIMPAN BIAYA</button>
-                        </div>
-                    </div>
-                    <div class="md:col-span-2 bg-white rounded-[2rem] card-shadow border overflow-hidden">
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-50 border-b">
-                                <tr>
-                                    <th class="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
-                                    <th class="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Deskripsi</th>
-                                    <th class="p-6 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Nominal</th>
-                                </tr>
-                            </thead>
-                            <tbody id="expense-list"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- TAB: HISTORY & LAPORAN -->
-            <section id="tab-history" class="tab-content hidden animate-in fade-in duration-500">
-                <div class="flex flex-wrap justify-between items-center gap-4 mb-8 no-print">
-                    <div class="flex bg-white p-1.5 rounded-2xl shadow-sm border gap-1">
-                        <button onclick="fetchHistory('all')" class="px-5 py-2 rounded-xl text-xs font-bold hover:bg-slate-50">SEMUA</button>
-                        <button onclick="fetchHistory('day')" class="px-5 py-2 rounded-xl text-xs font-bold hover:bg-slate-50">HARI INI</button>
-                        <button onclick="fetchHistory('month')" class="px-5 py-2 rounded-xl text-xs font-bold hover:bg-slate-50">BULAN INI</button>
-                    </div>
-                    <button onclick="window.print()" class="bg-slate-800 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-lg">CETAK LAPORAN RESMI</button>
-                </div>
-                <div class="bg-white rounded-[2rem] card-shadow border overflow-hidden">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 border-b">
-                            <tr>
-                                <th class="p-5 text-xs font-black text-slate-400">TANGGAL</th>
-                                <th class="p-5 text-xs font-black text-slate-400">TRANSAKSI</th>
-                                <th class="p-5 text-right text-xs font-black text-slate-400">TOTAL</th>
-                                <th class="p-5 text-center text-xs font-black text-slate-400">STATUS</th>
-                                <th class="p-5 text-xs font-black text-slate-400">AKSI</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-list"></tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- PRINT RECEIPT AREA -->
-    <div id="receipt-print" class="print-only text-center p-10 border-2 border-black m-10 font-mono">
-        <h1 class="text-3xl font-black uppercase">COCOSGLOBAL</h1>
-        <p class="text-sm" id="p-time"></p>
-        <div class="my-6 border-t-2 border-dashed border-black"></div>
-        <div id="p-body" class="text-left space-y-2 text-lg"></div>
-        <div class="my-6 border-t-2 border-dashed border-black"></div>
-        <h2 id="p-status" class="text-2xl font-black italic"></h2>
-        <p class="mt-8 text-xs italic">Bukti Transaksi Sah CocosGlobal System</p>
-    </div>
-
     <script>
-        // CONFIG - GANTI DENGAN PUNYA ANDA
-        const SB_URL = "https://vmxfvohcqrqkzkzblcix.supabase.co/rest/v1/";
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZteGZ2b2hjcXJxa3premJsY2l4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NTg4NzgsImV4cCI6MjA5MzUzNDg3OH0.Fir4V6KCSc6jGyIhByLTxaWN_q8h-pwm_WItdFKb21A";
-        const supabase = supabase.createClient(SB_URL, SB_KEY);
+        function warehouseApp() {
+            return {
+                // KONFIGURASI SUPABASE (Masukan URL dan Key di sini)
+                sbUrl: 'https://vmxfvohcqrqkzkzblcix.supabase.co/rest/v1/',
+                sbKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZteGZ2b2hjcXJxa3premJsY2l4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NTg4NzgsImV4cCI6MjA5MzUzNDg3OH0.Fir4V6KCSc6jGyIhByLTxaWN_q8h-pwm_WItdFKb21A',
+                supabase: null,
 
-        let userRole = 'kasir';
-        let stockCache = [];
-
-        // --- AUTH LOGIC ---
-        async function handleAuth(mode) {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-            
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) { alert("Akses Ditolak: " + error.message); return; }
-            checkSession();
-        }
-
-        async function checkSession() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                document.getElementById('auth-screen').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
+                tab: 'pos',
+                isOwner: false,
+                showPinModal: false,
+                inputPin: '',
+                ownerPin: '1234',
+                currentTime: '',
+                saldo: 25000000,
+                totalPiutang: 1250000,
+                modalInput: 0,
+                items: ['Kopra', 'Buah Kelapa Utuh', 'Sabut Kelapa', 'Tempurung', 'Arang Standard', 'Arang Briket'],
+                newTx: { type: 'BELI', item: 'Kopra', qty: 0, unit: 'Kg', total: 0, payMethod: 'Tunai' },
+                stockData: [
+                    { name: 'Buah Kelapa Utuh', kg: 500, pc: 1200, karung: 0 },
+                    { name: 'Kopra', kg: 1500, pc: 0, karung: 30 },
+                    { name: 'Arang Briket', kg: 200, pc: 0, karung: 15 },
+                    { name: 'Tempurung', kg: 800, pc: 0, karung: 10 },
+                    { name: 'Sabut Kelapa', kg: 300, pc: 0, karung: 50 },
+                    { name: 'Arang Standard', kg: 450, pc: 0, karung: 12 },
+                ],
+                history: [],
                 
-                userRole = session.user.email.includes('owner') ? 'owner' : 'kasir';
-                document.getElementById('user-role').innerText = userRole;
-                if(userRole === 'kasir') document.querySelectorAll('.owner-only').forEach(e => e.remove());
+                initApp() {
+                    // Inisialisasi Supabase client[cite: 1]
+                    if (this.sbUrl !== 'MASUKKAN_URL_SUPABASE_ANDA') {
+                        this.supabase = supabase.createClient(this.sbUrl, this.sbKey);
+                    }
+                    
+                    setInterval(() => { this.currentTime = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' }); }, 1000);
+                    this.loadData();
+                    lucide.createIcons();
+                },
+
+                formatRupiah(val) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val); },
                 
-                init();
+                verifyOwner() {
+                    if(this.inputPin === this.ownerPin) {
+                        this.isOwner = true;
+                        this.showPinModal = false;
+                        this.inputPin = '';
+                        this.$nextTick(() => { lucide.createIcons(); });
+                    } else { alert("PIN SALAH!"); this.inputPin = ''; }
+                },
+
+                logoutOwner() { this.isOwner = false; this.$nextTick(() => { lucide.createIcons(); }); },
+
+                async processTransaction() {
+                    if(this.newTx.total <= 0) return alert("Isi nominal!");
+                    
+                    const transactionData = { 
+                        id: Date.now(), 
+                        time: new Date().toLocaleTimeString('id-ID'), 
+                        type: this.newTx.type, 
+                        desc: `${this.newTx.item} (${this.newTx.qty} ${this.newTx.unit})`, 
+                        amount: this.newTx.total, 
+                        method: this.newTx.payMethod 
+                    };
+
+                    // Update UI Lokal
+                    this.history.unshift(transactionData);
+                    if(this.newTx.type === 'JUAL') this.saldo += this.newTx.total; else this.saldo -= this.newTx.total;
+                    
+                    // Simpan Lokal (Offline Support)[cite: 1]
+                    this.saveData();
+
+                    // Sinkronisasi ke Cloud (Supabase)[cite: 1]
+                    if (this.supabase) {
+                        try {
+                            const { error } = await this.supabase.from('transactions').insert([transactionData]);
+                            if (error) throw error;
+                        } catch (err) {
+                            console.error("Sinkronisasi cloud gagal:", err.message);
+                        }
+                    }
+
+                    window.print();
+                    this.newTx.qty = 0;
+                    this.newTx.total = 0;
+                },
+
+                async deleteTx(id) {
+                    if(confirm("Hapus transaksi ini secara permanen?")) {
+                        this.history = this.history.filter(t => t.id !== id);
+                        this.saveData();
+                        if (this.supabase) {
+                            await this.supabase.from('transactions').delete().eq('id', id);
+                        }
+                    }
+                },
+
+                async addModal() {
+                    if(this.modalInput <= 0) return;
+                    const modalTx = { 
+                        id: Date.now(), 
+                        time: new Date().toLocaleTimeString('id-ID'), 
+                        type: 'MODAL', 
+                        desc: 'Suntik Modal Kas', 
+                        amount: this.modalInput, 
+                        method: 'Transfer' 
+                    };
+                    this.saldo += this.modalInput;
+                    this.history.unshift(modalTx);
+                    if (this.supabase) await this.supabase.from('transactions').insert([modalTx]);
+                    this.modalInput = 0;
+                    this.saveData();
+                    alert("Kas Berhasil Ditambah!");
+                },
+
+                saveData() { 
+                    localStorage.setItem('pt_abcd_data', JSON.stringify({ 
+                        history: this.history, 
+                        saldo: this.saldo, 
+                        piutang: this.totalPiutang 
+                    })); 
+                },
+
+                loadData() {
+                    const saved = localStorage.getItem('pt_abcd_data');
+                    if(saved) {
+                        const data = JSON.parse(saved);
+                        this.history = data.history || [];
+                        this.saldo = data.saldo || 25000000;
+                        this.totalPiutang = data.piutang || 0;
+                    }
+                }
             }
         }
-
-        function logout() { supabase.auth.signOut(); location.reload(); }
-
-        // --- APP CORE ---
-        async function init() {
-            loadLogo();
-            fetchStocks();
-            fetchFinance();
-            fetchExpenses();
-            fetchHistory();
-            
-            // Realtime Update
-            supabase.channel('cocos-db').on('postgres_changes', { event: '*', schema: 'public' }, () => {
-                fetchStocks(); fetchFinance(); fetchExpenses(); fetchHistory();
-            }).subscribe();
-        }
-
-        async function fetchStocks() {
-            const { data } = await supabase.from('warehouse_stock').select('*').order('commodity_name');
-            stockCache = data;
-            const table = document.getElementById('stock-list');
-            const select = document.getElementById('tx-item');
-            table.innerHTML = ""; select.innerHTML = "";
-            
-            data.forEach(s => {
-                table.innerHTML += `
-                    <tr class="border-b hover:bg-slate-50 transition">
-                        <td class="p-6 font-bold text-slate-700">${s.commodity_name}</td>
-                        <td class="p-6 text-right font-black text-green-600 text-xl">${s.stock_quantity.toLocaleString()}</td>
-                        <td class="p-6 text-center text-xs font-bold text-slate-400">${s.unit}</td>
-                    </tr>`;
-                select.innerHTML += `<option value="${s.id}">${s.commodity_name} (${s.unit})</option>`;
-            });
-        }
-
-        async function fetchFinance() {
-            const { data } = await supabase.from('finance_summary').select('*').single();
-            if (data) {
-                document.getElementById('stat-balance').innerText = "Rp " + data.total_balance.toLocaleString('id-ID');
-                document.getElementById('stat-receivable').innerText = "Rp " + data.total_receivable.toLocaleString('id-ID');
-            }
-        }
-
-        async function processTransaction() {
-            const id = document.getElementById('tx-item').value;
-            const name = document.getElementById('tx-item').options[document.getElementById('tx-item').selectedIndex].text;
-            const type = document.getElementById('tx-type').value;
-            const qty = parseFloat(document.getElementById('tx-qty').value);
-            const price = parseFloat(document.getElementById('tx-price').value);
-            const method = document.getElementById('tx-method').value;
-            const total = qty * price;
-
-            if(!qty || !price) { alert("Isi jumlah dan harga!"); return; }
-
-            // 1. Simpan Log Transaksi
-            await supabase.from('transactions').insert([{
-                type, commodity_id: id, quantity: qty, unit_price: price, 
-                total_price: total, payment_method: method, status: (method === 'bon' ? 'piutang' : 'lunas')
-            }]);
-
-            // 2. Update Stok Barang
-            const currentItem = stockCache.find(x => x.id == id);
-            let newStock = type === 'jual' ? currentItem.stock_quantity - qty : currentItem.stock_quantity + qty;
-            await supabase.from('warehouse_stock').update({ stock_quantity: newStock }).eq('id', id);
-
-            // 3. Update Keuangan
-            const { data: fin } = await supabase.from('finance_summary').select('*').single();
-            let bal = fin.total_balance;
-            let rec = fin.total_receivable;
-
-            if(type === 'jual') {
-                if(method === 'bon') rec += total; else bal += total;
-            } else {
-                bal -= total; // Pembelian memotong kas
-            }
-            await supabase.from('finance_summary').update({ total_balance: bal, total_receivable: rec }).eq('id', 1);
-
-            printReceipt(name, qty, total, method);
-            alert("Berhasil disimpan!");
-            resetPOS();
-        }
-
-        async function fetchHistory(filter = 'all') {
-            const { data } = await supabase.from('transactions').select(`*, warehouse_stock(commodity_name)`).order('created_at', {ascending: false});
-            const list = document.getElementById('history-list');
-            list.innerHTML = "";
-            
-            data.filter(t => {
-                const d = new Date(t.created_at);
-                const n = new Date();
-                if(filter === 'day') return d.toDateString() === n.toDateString();
-                if(filter === 'month') return d.getMonth() === n.getMonth();
-                return true;
-            }).forEach(t => {
-                const isPiutang = t.status === 'piutang';
-                list.innerHTML += `
-                    <tr class="border-b text-xs">
-                        <td class="p-5 font-medium text-slate-400">${new Date(t.created_at).toLocaleString('id-ID')}</td>
-                        <td class="p-5 font-bold uppercase">${t.type} - ${t.warehouse_stock.commodity_name} (${t.quantity})</td>
-                        <td class="p-5 text-right font-black">Rp ${t.total_price.toLocaleString()}</td>
-                        <td class="p-5 text-center">
-                            <span class="px-3 py-1 rounded-full font-black text-[9px] uppercase ${isPiutang ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}">
-                                ${t.status}
-                            </span>
-                        </td>
-                        <td class="p-5">
-                            ${isPiutang ? `<button onclick="lunasiBon('${t.id}', ${t.total_price})" class="bg-slate-900 text-white px-3 py-1 rounded-lg text-[10px] font-bold">LUNASI</button>` : '-'}
-                        </td>
-                    </tr>`;
-            });
-        }
-
-        async function lunasiBon(id, amount) {
-            if(!confirm("Uang bon sudah diterima?")) return;
-            await supabase.from('transactions').update({ status: 'lunas' }).eq('id', id);
-            const { data: fin } = await supabase.from('finance_summary').select('*').single();
-            await supabase.from('finance_summary').update({ 
-                total_balance: fin.total_balance + amount, 
-                total_receivable: fin.total_receivable - amount 
-            }).eq('id', 1);
-        }
-
-        // --- EXPENSES (PENGELUARAN) ---
-        async function submitExpense() {
-            const desc = document.getElementById('exp-desc').value;
-            const amt = parseFloat(document.getElementById('exp-amount').value);
-            if(!amt) return;
-
-            await supabase.from('expenses').insert([{ description: desc, amount: amt }]);
-            const { data: fin } = await supabase.from('finance_summary').select('*').single();
-            await supabase.from('finance_summary').update({ total_balance: fin.total_balance - amt }).eq('id', 1);
-            
-            document.getElementById('exp-desc').value = "";
-            document.getElementById('exp-amount').value = "";
-            alert("Biaya dicatat!");
-        }
-
-        async function fetchExpenses() {
-            const { data } = await supabase.from('expenses').select('*').order('created_at', {ascending: false});
-            const list = document.getElementById('expense-list');
-            list.innerHTML = "";
-            data.forEach(e => {
-                list.innerHTML += `
-                    <tr class="border-b">
-                        <td class="p-6 text-xs text-slate-400">${new Date(e.created_at).toLocaleDateString()}</td>
-                        <td class="p-6 font-bold text-slate-700">${e.description}</td>
-                        <td class="p-6 text-right font-black text-red-500">Rp ${e.amount.toLocaleString()}</td>
-                    </tr>`;
-            });
-        }
-
-        // --- UI HELPERS ---
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
-            document.getElementById('tab-'+tab).classList.remove('hidden');
-            document.querySelectorAll('nav button, .flex button').forEach(b => b.classList.remove('active-tab', 'text-slate-400'));
-            document.getElementById('btn-'+tab).classList.add('active-tab');
-        }
-
-        function topUpModal() {
-            const val = prompt("Input Modal Kas Masuk (IDR):");
-            if(val) {
-                supabase.from('finance_summary').select('total_balance').single().then(({data}) => {
-                    supabase.from('finance_summary').update({ total_balance: data.total_balance + parseFloat(val) }).eq('id', 1).then(() => alert("Modal masuk!"));
-                });
-            }
-        }
-
-        function updateLogo(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                document.getElementById('app-logo').src = ev.target.result;
-                localStorage.setItem('cocos_logo', ev.target.result);
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function loadLogo() {
-            const logo = localStorage.getItem('cocos_logo');
-            if(logo) document.getElementById('app-logo').src = logo;
-        }
-
-        function printReceipt(name, qty, total, method) {
-            document.getElementById('p-time').innerText = new Date().toLocaleString();
-            document.getElementById('p-status').innerText = method === 'bon' ? "PIUTANG (BELUM LUNAS)" : "LUNAS";
-            document.getElementById('p-body').innerHTML = `
-                ITEM   : ${name}<br>JUMLAH : ${qty}<br>TOTAL  : Rp ${total.toLocaleString()}<br>BAYAR  : ${method.toUpperCase()}
-            `;
-            window.print();
-        }
-
-        function resetPOS() {
-            document.getElementById('tx-qty').value = "";
-            document.getElementById('tx-price').value = "";
-        }
-
-        window.onload = checkSession;
     </script>
 </body>
 </html>
